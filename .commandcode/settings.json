@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(C:\\Users\\corre\\miniconda3\\envs\\agenda_verify\\python.exe:*)",
+      "Shell(C:\\Users\\corre\\miniconda3\\Scripts\\conda.exe:*)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}
