@@ -1,0 +1,24 @@
+# --- Entornos virtuales / artefactos locales ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# --- Secretos: NUNCA meter el .env en la imagen ---
+.env
+.env.*
+!.env.example
+
+# --- VCS / IDE / docs ---
+.git/
+.gitignore
+.commandcode/
+.idea/
+.vscode/
+*.md

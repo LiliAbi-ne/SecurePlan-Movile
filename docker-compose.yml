@@ -1,0 +1,33 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "false"
+      # Genera uno con: python -c "import secrets; print(secrets.token_urlsafe(64))"
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?define JWT_SECRET_KEY en tu .env}
+      MONGODB_URL: mongodb://mongo:27017
+      MONGODB_DB_NAME: agenda
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:8081"]'
+    ports:
+      - "8000:8000"
+
+volumes:
+  mongo_data:
