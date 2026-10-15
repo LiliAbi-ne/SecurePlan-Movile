@@ -1,4 +1,4 @@
-# Agenda API — Backend (Sprint 1)
+# Agenda API (Sprint 1)
 
 Backend desacoplado para la aplicación móvil de gestión del tiempo y productividad
 (**Agenda**). Implementa la base móvil, la arquitectura modular y la autenticación
