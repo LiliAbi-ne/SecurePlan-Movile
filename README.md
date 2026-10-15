@@ -41,28 +41,16 @@ CALENDARIO/
 └── README.md
 ```
 
+## Requisitos
+
+- **Python 3.14** (obligatorio). Todas las dependencias publican wheels para
+  CPython 3.14, así que la instalación no compila nada (sin Rust ni toolchain C).
+
 ## Puesta en marcha
 
-### 1. Requisitos
+### 1. Crear entorno e instalar dependencias
 
-- **Python 3.11 o 3.12.** Evita 3.13+ / 3.14: `passlib` aún no es compatible con
-  esos intérpretes (el módulo estándar `crypt` fue eliminado).
-- Una instancia de MongoDB (local o Atlas).
-
-> **Si tu único Python es 3.13+** (por ejemplo 3.14), crea un entorno 3.12 con conda:
->
-> ```bash
-> conda create -n agenda python=3.12 -y
-> conda activate agenda
-> ```
->
-> Si prefieres no aceptar los Términos de Servicio de Anaconda, usa conda-forge:
->
-> ```bash
-> conda create -n agenda python=3.12 -c conda-forge --override-channels -y
-> ```
-
-### 2. Crear entorno e instalar dependencias
+Comprueba que `python` es la versión 3.14 (`python --version`):
 
 ```bash
 python -m venv .venv
@@ -74,7 +62,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Configurar variables de entorno
+### 2. Configurar variables de entorno
 
 ```bash
 cp .env.example .env
@@ -84,7 +72,7 @@ python -c "import secrets; print(secrets.token_urlsafe(64))"
 
 Pega el valor generado en `JWT_SECRET_KEY` dentro de `.env`.
 
-### 4. Arrancar la API
+### 3. Arrancar la API
 
 ```bash
 uvicorn app.main:app --reload
@@ -93,7 +81,7 @@ uvicorn app.main:app --reload
 - Documentación interactiva (solo en `development`): http://localhost:8000/docs
 - Health check: http://localhost:8000/api/v1/health
 
-### 5. Probar el flujo de autenticación
+### 4. Probar el flujo de autenticación
 
 ```bash
 # Registro

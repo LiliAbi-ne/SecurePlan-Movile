@@ -1,28 +1,28 @@
 # =============================================================================
 # Agenda API - Dependencias (Sprint 1)
 # Stack: FastAPI + MongoDB (Motor) + JWT + Argon2
-# Python recomendado: 3.11 - 3.12  (evitar 3.13 por incompatibilidad de passlib)
+# Python: 3.14  (todas las dependencias publican wheels cp314, sin compilar)
 # =============================================================================
 
 # --- Web framework / ASGI ---
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
+fastapi==0.143.2
+uvicorn[standard]==0.54.0
 
 # --- Base de datos asíncrona ---
-motor==3.6.0
-pymongo==4.9.2
+motor==3.7.1
+pymongo==4.19.0
 
 # --- Validación y configuración ---
-pydantic==2.10.4
-pydantic-settings==2.7.0
-email-validator==2.2.0
+pydantic==2.14.1
+pydantic-settings==2.16.0
+email-validator==2.3.0
 
 # --- Seguridad: hashing de contraseñas (Argon2) ---
 passlib[argon2]==1.7.4
-argon2-cffi==23.1.0
+argon2-cffi==25.1.0
 
 # --- Tokens JWT ---
-PyJWT==2.10.1
+PyJWT==2.15.1
 
 # --- Utilidades ---
-python-dotenv==1.0.1
+python-dotenv==1.2.4
