@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.database import mongo
-from app.routers import auth
+from app.routers import auth, events
 
 logging.basicConfig(
     level=logging.INFO,
@@ -107,6 +107,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 # --- Routers ---
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
+app.include_router(events.router, prefix=settings.API_V1_PREFIX)
 
 
 # --- Endpoint de salud (útil para orquestadores / load balancers) ---
