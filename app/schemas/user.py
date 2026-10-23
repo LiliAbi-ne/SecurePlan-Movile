@@ -15,7 +15,10 @@ _PASSWORD_MAX_LENGTH = 128
 
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: EmailStr = Field(
+        ...,
+        description="Correo electrónico del usuario (se normaliza a minúsculas).",
+    )
 
 
 class UserCreate(UserBase):
@@ -23,7 +26,15 @@ class UserCreate(UserBase):
 
     model_config = ConfigDict(extra="forbid")
 
-    password: str = Field(..., min_length=_PASSWORD_MIN_LENGTH, max_length=_PASSWORD_MAX_LENGTH)
+    password: str = Field(
+        ...,
+        min_length=_PASSWORD_MIN_LENGTH,
+        max_length=_PASSWORD_MAX_LENGTH,
+        description=(
+            f"Contraseña en claro de {_PASSWORD_MIN_LENGTH} a {_PASSWORD_MAX_LENGTH} "
+            "caracteres. Debe incluir mayúscula, minúscula, dígito y carácter especial."
+        ),
+    )
 
     @field_validator("password")
     @classmethod
@@ -44,8 +55,20 @@ class UserPublic(UserBase):
     """Representación pública del usuario que se devuelve por la API."""
 
     # Permite construir el schema a partir del `UserModel` (que tiene `id`).
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "email": "user@example.com",
+                "id": "507f1f77bcf86cd799439011",
+                "is_active": True,
+                "created_at": "2026-01-15T09:30:00Z",
+            }
+        },
+    )
 
-    id: str
-    is_active: bool
-    created_at: datetime
+    id: str = Field(
+        ..., description="Identificador del usuario (ObjectId en formato str)."
+    )
+    is_active: bool = Field(..., description="Indica si la cuenta está activa.")
+    created_at: datetime = Field(..., description="Fecha de alta del usuario (UTC).")

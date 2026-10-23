@@ -113,12 +113,41 @@ def normalize_category_filter(value: str) -> str:
 class _EventFields(BaseModel):
     """Campos y validadores comunes a creación y actualización."""
 
-    title: str = Field(..., min_length=1, max_length=_TITLE_MAX)
-    description: Optional[str] = Field(default=None, max_length=_DESCRIPTION_MAX)
-    date: str
-    time: str
-    category: str = Field(..., min_length=1, max_length=_CATEGORY_MAX)
-    priority: Priority
+    title: str = Field(
+        ...,
+        min_length=1,
+        max_length=_TITLE_MAX,
+        description=f"Título del evento ({_TITLE_MAX} caracteres como máximo).",
+    )
+    description: Optional[str] = Field(
+        default=None,
+        max_length=_DESCRIPTION_MAX,
+        description=(
+            f"Descripción opcional ({_DESCRIPTION_MAX} caracteres como máximo). "
+            "Una cadena vacía se interpreta como ausencia de descripción."
+        ),
+    )
+    date: str = Field(
+        ...,
+        description="Fecha del evento en formato `YYYY-MM-DD`.",
+    )
+    time: str = Field(
+        ...,
+        description="Hora del evento en formato `HH:MM` (24 horas).",
+    )
+    category: str = Field(
+        ...,
+        min_length=1,
+        max_length=_CATEGORY_MAX,
+        description=(
+            f"Categoría de texto libre (≤{_CATEGORY_MAX}), normalizada a minúsculas. "
+            "Se sugieren: personal, trabajo, estudio, salud, ocio, otro."
+        ),
+    )
+    priority: Priority = Field(
+        ...,
+        description="Prioridad del evento: `baja`, `media` o `alta`.",
+    )
 
     @field_validator("title")
     @classmethod
@@ -149,22 +178,59 @@ class _EventFields(BaseModel):
 class EventCreate(_EventFields):
     """Payload de creación de un evento. El dueño lo pone el servidor."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "title": "Cita dentista",
+                "description": "Llevar radiografía",
+                "date": "2026-11-05",
+                "time": "10:30",
+                "category": "salud",
+                "priority": "alta",
+            }
+        },
+    )
 
 
 class EventUpdate(_EventFields):
     """Payload de actualización parcial (PATCH). Todos los campos opcionales."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {"priority": "media", "time": "11:00"}
+        },
+    )
 
     # Redefinimos los campos como opcionales. Los validadores heredados de
     # `_EventFields` se siguen aplicando cuando el campo está presente.
-    title: Optional[str] = Field(default=None, min_length=1, max_length=_TITLE_MAX)
-    description: Optional[str] = Field(default=None, max_length=_DESCRIPTION_MAX)
-    date: Optional[str] = None
-    time: Optional[str] = None
-    category: Optional[str] = Field(default=None, min_length=1, max_length=_CATEGORY_MAX)
-    priority: Optional[Priority] = None
+    title: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=_TITLE_MAX,
+        description="Nuevo título del evento.",
+    )
+    description: Optional[str] = Field(
+        default=None,
+        max_length=_DESCRIPTION_MAX,
+        description="Nueva descripción. Enviar `null` borra la descripción.",
+    )
+    date: Optional[str] = Field(
+        default=None, description="Nueva fecha en formato `YYYY-MM-DD`."
+    )
+    time: Optional[str] = Field(
+        default=None, description="Nueva hora en formato `HH:MM` (24 horas)."
+    )
+    category: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=_CATEGORY_MAX,
+        description="Nueva categoría (texto libre, normalizado a minúsculas).",
+    )
+    priority: Optional[Priority] = Field(
+        default=None, description="Nueva prioridad: `baja`, `media` o `alta`."
+    )
 
     @model_validator(mode="after")
     def _check_update_payload(self) -> "EventUpdate":
@@ -181,14 +247,31 @@ class EventUpdate(_EventFields):
 class EventPublic(BaseModel):
     """Representación pública de un evento devuelta por la API."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "507f1f77bcf86cd799439011",
+                "title": "Cita dentista",
+                "description": "Llevar radiografía",
+                "date": "2026-11-05",
+                "time": "10:30",
+                "category": "salud",
+                "priority": "alta",
+                "created_at": "2026-11-01T08:15:00Z",
+                "updated_at": "2026-11-01T08:15:00Z",
+            }
+        },
+    )
 
-    id: str
-    title: str
-    description: Optional[str] = None
-    date: str
-    time: str
-    category: str
-    priority: Priority
-    created_at: datetime
-    updated_at: datetime
+    id: str = Field(..., description="Identificador del evento (ObjectId en formato str).")
+    title: str = Field(..., description="Título del evento.")
+    description: Optional[str] = Field(
+        default=None, description="Descripción del evento, si la tiene."
+    )
+    date: str = Field(..., description="Fecha del evento (`YYYY-MM-DD`).")
+    time: str = Field(..., description="Hora del evento (`HH:MM`, 24 h).")
+    category: str = Field(..., description="Categoría del evento (normalizada).")
+    priority: Priority = Field(..., description="Prioridad: `baja`, `media` o `alta`.")
+    created_at: datetime = Field(..., description="Fecha de creación (UTC).")
+    updated_at: datetime = Field(..., description="Fecha de la última modificación (UTC).")

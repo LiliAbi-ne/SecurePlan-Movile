@@ -126,6 +126,10 @@ Campos de un evento: `title` (1–120), `description` opcional (≤2000),
 Filtros del listado (`GET /events`): `category`, `priority`, `date_from`,
 `date_to`, `limit` (1–100, def. 20) y `offset` (≥0).
 
+La documentación interactiva (`/docs` y `/redoc`) describe cada endpoint con sus
+parámetros, las respuestas de error (401/403/404/409/422) y ejemplos de
+petición/respuesta; el esquema OpenAPI completo está en `/openapi.json`.
+
 ```bash
 # Crear
 curl -X POST http://localhost:8000/api/v1/events \
