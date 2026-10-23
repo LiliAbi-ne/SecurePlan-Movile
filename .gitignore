@@ -36,3 +36,6 @@ Thumbs.db
 # --- Logs ---
 *.log
 logs/
+
+# --- Tooling del agente (config/preferencias locales, no versionar) ---
+.commandcode/
