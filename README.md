@@ -40,8 +40,11 @@ CALENDARIO/
 │       ├── auth.py             # /auth/register, /auth/login, /auth/me
 │       └── events.py           # /events (CRUD protegido)
 ├── tests/                      # (pendiente para siguientes sprints)
+├── scripts/
+│   └── export_openapi.py       # Genera openapi.yml desde el código (code-first)
 ├── .env.example                # Plantilla de variables de entorno
 ├── .gitignore
+├── openapi.yml                 # Contrato OpenAPI generado (copia estática para el front)
 ├── requirements.txt
 └── README.md
 ```
@@ -128,7 +131,17 @@ Filtros del listado (`GET /events`): `category`, `priority`, `date_from`,
 
 La documentación interactiva (`/docs` y `/redoc`) describe cada endpoint con sus
 parámetros, las respuestas de error (401/403/404/409/422) y ejemplos de
-petición/respuesta; el esquema OpenAPI completo está en `/openapi.json`.
+petición/respuesta; el esquema OpenAPI completo se sirve en `/openapi.json`.
+
+Para consumir el contrato sin levantar el servidor —generar un cliente o los
+tipos del frontend, mocks, validar en CI— hay una copia estática versionada en
+[`openapi.yml`](./openapi.yml). Es un **artefacto generado** a partir del código
+(FastAPI es *code-first*), así que **hay que regenerarlo** cuando cambien las
+rutas o los schemas:
+
+```bash
+python scripts/export_openapi.py
+```
 
 ```bash
 # Crear
