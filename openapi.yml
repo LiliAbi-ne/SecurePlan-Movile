@@ -1,0 +1,733 @@
+openapi: 3.1.0
+info:
+  title: Agenda API
+  description: |2
+
+    API desacoplada para la aplicación móvil de gestión del tiempo **Agenda**.
+
+    ## Autenticación
+    Las rutas de **Eventos** requieren un token JWT. Obtén uno en
+    `POST /api/v1/auth/login` y pulsa el botón **Authorize** para enviarlo como
+    `Authorization: Bearer <token>`.
+
+    ## Aislamiento por usuario
+    Cada usuario solo puede ver y gestionar **sus propios** eventos. Un evento ajeno
+    se responde como inexistente (404) para no revelar su existencia (mitigación de
+    IDOR / OWASP API1 BOLA).
+  version: 1.0.0
+paths:
+  /api/v1/auth/register:
+    post:
+      tags:
+      - Autenticación
+      summary: Registrar un nuevo usuario
+      description: Da de alta un usuario. La contraseña debe cumplir la política mínima (longitud, mayúscula, minúscula, dígito y carácter especial). El email no puede estar ya registrado.
+      operationId: registerUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+        required: true
+      responses:
+        '201':
+          description: El usuario creado (sin datos sensibles).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPublic'
+        '409':
+          description: El email ya está registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Datos de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/auth/login:
+    post:
+      tags:
+      - Autenticación
+      summary: Iniciar sesión y obtener un access token
+      description: Valida las credenciales y devuelve un JWT de acceso. Si el email no existe o la contraseña no coincide, responde 401 con un mensaje genérico (no revela cuál de los dos campos falló).
+      operationId: loginUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '200':
+          description: El token de acceso y su tiempo de vida en segundos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+        '401':
+          description: Email o contraseña incorrectos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: La cuenta está desactivada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Datos de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/auth/me:
+    get:
+      tags:
+      - Autenticación
+      summary: Obtener el usuario autenticado
+      description: 'Devuelve los datos públicos del usuario dueño del token. Requiere `Authorization: Bearer <token>`.'
+      operationId: readCurrentUser
+      responses:
+        '200':
+          description: El usuario autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPublic'
+        '401':
+          description: Token ausente o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: La cuenta está desactivada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/events/categories:
+    get:
+      tags:
+      - Eventos
+      summary: Categorías sugeridas
+      description: 'Devuelve las categorías preset que la app ofrece como atajo. No es una lista cerrada: el campo `category` admite cualquier texto válido.'
+      operationId: listEventCategories
+      responses:
+        '200':
+          description: Lista de categorías sugeridas.
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+                title: Response Listeventcategories
+        '401':
+          description: Token ausente o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: La cuenta está desactivada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/events:
+    post:
+      tags:
+      - Eventos
+      summary: Crear un evento
+      description: Crea un evento cuyo dueño es SIEMPRE el usuario del token. Cualquier intento de fijar el dueño (`user_id`) u otros campos internos se rechaza con 422.
+      operationId: createEvent
+      security:
+      - OAuth2PasswordBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreate'
+      responses:
+        '201':
+          description: El evento creado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPublic'
+        '401':
+          description: Token ausente o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: La cuenta está desactivada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Datos de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags:
+      - Eventos
+      summary: Listar mis eventos
+      description: Lista los eventos del usuario autenticado, ordenados por fecha y hora ascendentes. Admite filtros por `category`, `priority` y rango de fechas (`date_from`/`date_to`), además de paginación con `limit`/`offset`.
+      operationId: listEvents
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: category
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Category
+      - name: priority
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/Priority'
+          - type: 'null'
+          title: Priority
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          - type: 'null'
+          title: Date From
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          - type: 'null'
+          title: Date To
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Los eventos del usuario que cumplen los filtros.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventPublic'
+                title: Response Listevents
+        '401':
+          description: Token ausente o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: La cuenta está desactivada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Datos de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/events/{event_id}:
+    get:
+      tags:
+      - Eventos
+      summary: Obtener un evento propio
+      description: Devuelve un evento del usuario. Si el evento no existe o pertenece a otro usuario se responde 404 en ambos casos, para no revelar su existencia (mitigación de IDOR / OWASP API1 BOLA).
+      operationId: getEvent
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Event Id
+      responses:
+        '200':
+          description: El evento solicitado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPublic'
+        '401':
+          description: Token ausente o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: La cuenta está desactivada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Evento no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Datos de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags:
+      - Eventos
+      summary: Actualizar un evento propio
+      description: 'Actualización parcial: solo se modifican los campos enviados (al menos uno). `description: null` borra la descripción; el resto de campos no pueden ser nulos. Un evento ajeno responde 404, igual que uno inexistente.'
+      operationId: updateEvent
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Event Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventUpdate'
+      responses:
+        '200':
+          description: El evento actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPublic'
+        '401':
+          description: Token ausente o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: La cuenta está desactivada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Evento no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Datos de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+      - Eventos
+      summary: Eliminar un evento propio
+      description: Elimina un evento del usuario. Responde 204 sin cuerpo si lo borra, o 404 si no existe o pertenece a otro usuario.
+      operationId: deleteEvent
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Event Id
+      responses:
+        '204':
+          description: Evento eliminado (sin cuerpo).
+        '401':
+          description: Token ausente o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: La cuenta está desactivada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Evento no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Datos de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/health:
+    get:
+      tags:
+      - Sistema
+      summary: Health check
+      description: Comprueba que el servicio está en pie (útil para orquestadores).
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Estado del servicio.
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Healthcheck
+components:
+  schemas:
+    ErrorResponse:
+      properties:
+        detail:
+          type: string
+          title: Detail
+          description: Descripción del error en lenguaje natural
+      type: object
+      required:
+      - detail
+      title: ErrorResponse
+      description: Cuerpo estándar de un error de la API.
+      example:
+        detail: Evento no encontrado
+    EventCreate:
+      properties:
+        title:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Title
+          description: Título del evento (120 caracteres como máximo).
+        description:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Description
+          description: Descripción opcional (2000 caracteres como máximo). Una cadena vacía se interpreta como ausencia de descripción.
+        date:
+          type: string
+          title: Date
+          description: Fecha del evento en formato `YYYY-MM-DD`.
+        time:
+          type: string
+          title: Time
+          description: Hora del evento en formato `HH:MM` (24 horas).
+        category:
+          type: string
+          maxLength: 40
+          minLength: 1
+          title: Category
+          description: 'Categoría de texto libre (≤40), normalizada a minúsculas. Se sugieren: personal, trabajo, estudio, salud, ocio, otro.'
+        priority:
+          $ref: '#/components/schemas/Priority'
+          description: 'Prioridad del evento: `baja`, `media` o `alta`.'
+      additionalProperties: false
+      type: object
+      required:
+      - title
+      - date
+      - time
+      - category
+      - priority
+      title: EventCreate
+      description: Payload de creación de un evento. El dueño lo pone el servidor.
+      example:
+        category: salud
+        date: '2026-11-05'
+        description: Llevar radiografía
+        priority: alta
+        time: '10:30'
+        title: Cita dentista
+    EventPublic:
+      properties:
+        id:
+          type: string
+          title: Id
+          description: Identificador del evento (ObjectId en formato str).
+        title:
+          type: string
+          title: Title
+          description: Título del evento.
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          description: Descripción del evento, si la tiene.
+        date:
+          type: string
+          title: Date
+          description: Fecha del evento (`YYYY-MM-DD`).
+        time:
+          type: string
+          title: Time
+          description: Hora del evento (`HH:MM`, 24 h).
+        category:
+          type: string
+          title: Category
+          description: Categoría del evento (normalizada).
+        priority:
+          $ref: '#/components/schemas/Priority'
+          description: 'Prioridad: `baja`, `media` o `alta`.'
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+          description: Fecha de creación (UTC).
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+          description: Fecha de la última modificación (UTC).
+      type: object
+      required:
+      - id
+      - title
+      - date
+      - time
+      - category
+      - priority
+      - created_at
+      - updated_at
+      title: EventPublic
+      description: Representación pública de un evento devuelta por la API.
+      example:
+        category: salud
+        created_at: '2026-11-01T08:15:00Z'
+        date: '2026-11-05'
+        description: Llevar radiografía
+        id: 507f1f77bcf86cd799439011
+        priority: alta
+        time: '10:30'
+        title: Cita dentista
+        updated_at: '2026-11-01T08:15:00Z'
+    EventUpdate:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 120
+            minLength: 1
+          - type: 'null'
+          title: Title
+          description: Nuevo título del evento.
+        description:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Description
+          description: Nueva descripción. Enviar `null` borra la descripción.
+        date:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Date
+          description: Nueva fecha en formato `YYYY-MM-DD`.
+        time:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Time
+          description: Nueva hora en formato `HH:MM` (24 horas).
+        category:
+          anyOf:
+          - type: string
+            maxLength: 40
+            minLength: 1
+          - type: 'null'
+          title: Category
+          description: Nueva categoría (texto libre, normalizado a minúsculas).
+        priority:
+          anyOf:
+          - $ref: '#/components/schemas/Priority'
+          - type: 'null'
+          description: 'Nueva prioridad: `baja`, `media` o `alta`.'
+      additionalProperties: false
+      type: object
+      title: EventUpdate
+      description: Payload de actualización parcial (PATCH). Todos los campos opcionales.
+      example:
+        priority: media
+        time: '11:00'
+    LoginRequest:
+      properties:
+        email:
+          type: string
+          format: email
+          title: Email
+          description: Correo electrónico registrado.
+        password:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Password
+          description: Contraseña de la cuenta.
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - password
+      title: LoginRequest
+      description: Credenciales recibidas en el login (cuerpo JSON).
+      example:
+        email: user@example.com
+        password: S3gur4-Password!
+    Priority:
+      type: string
+      enum:
+      - baja
+      - media
+      - alta
+      title: Priority
+      description: 'Prioridad del evento. Enum cerrado: cualquier otro valor se rechaza.'
+    Token:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+          description: JWT firmado para autenticar peticiones.
+        token_type:
+          type: string
+          title: Token Type
+          description: Tipo de token (siempre `bearer`).
+          default: bearer
+        expires_in:
+          type: integer
+          title: Expires In
+          description: Segundos de vida del token de acceso.
+      type: object
+      required:
+      - access_token
+      - expires_in
+      title: Token
+      description: Respuesta estándar OAuth2 con el token de acceso.
+      example:
+        access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        expires_in: 900
+        token_type: bearer
+    UserCreate:
+      properties:
+        email:
+          type: string
+          format: email
+          title: Email
+          description: Correo electrónico del usuario (se normaliza a minúsculas).
+        password:
+          type: string
+          maxLength: 128
+          minLength: 12
+          title: Password
+          description: Contraseña en claro de 12 a 128 caracteres. Debe incluir mayúscula, minúscula, dígito y carácter especial.
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - password
+      title: UserCreate
+      description: Payload del registro. `extra="forbid"` rechaza campos desconocidos.
+    UserPublic:
+      properties:
+        email:
+          type: string
+          format: email
+          title: Email
+          description: Correo electrónico del usuario (se normaliza a minúsculas).
+        id:
+          type: string
+          title: Id
+          description: Identificador del usuario (ObjectId en formato str).
+        is_active:
+          type: boolean
+          title: Is Active
+          description: Indica si la cuenta está activa.
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+          description: Fecha de alta del usuario (UTC).
+      type: object
+      required:
+      - email
+      - id
+      - is_active
+      - created_at
+      title: UserPublic
+      description: Representación pública del usuario que se devuelve por la API.
+      example:
+        created_at: '2026-01-15T09:30:00Z'
+        email: user@example.com
+        id: 507f1f77bcf86cd799439011
+        is_active: true
+  securitySchemes:
+    OAuth2PasswordBearer:
+      type: oauth2
+      flows:
+        password:
+          scopes: {}
+          tokenUrl: /api/v1/auth/login
+tags:
+- name: Sistema
+  description: Estado del servicio (health check).
+- name: Autenticación
+  description: Registro, inicio de sesión y datos del usuario autenticado. Las contraseñas se almacenan con Argon2 y los tokens son JWT firmados.
+- name: Eventos
+  description: CRUD de actividades diarias. Todas las rutas requieren autenticación y están acotadas al usuario del token (anti-IDOR).

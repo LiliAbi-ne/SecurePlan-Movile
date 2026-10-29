@@ -16,6 +16,7 @@ import logging
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.core.config import get_settings
+from app.models.event import EVENT_COLLECTION
 from app.models.user import USER_COLLECTION
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,14 @@ class MongoConnection:
         # servicio), evitando condiciones de carrera.
         await self._database[USER_COLLECTION].create_index(
             "email", unique=True, name="uniq_email"
+        )
+
+        # Índice compuesto para el listado de eventos de un usuario (scoped por
+        # `user_id`) y su orden por fecha/hora. Acelera las consultas y refuerza
+        # el aislamiento por dueño a nivel de base de datos.
+        await self._database[EVENT_COLLECTION].create_index(
+            [("user_id", 1), ("date", 1), ("time", 1)],
+            name="user_date_time",
         )
 
     async def close(self) -> None:

@@ -1,8 +1,8 @@
-# Agenda API (Sprint 1)
+# Agenda API (Sprint 2)
 
 Backend desacoplado para la aplicación móvil de gestión del tiempo y productividad
-(**Agenda**). Implementa la base móvil, la arquitectura modular y la autenticación
-segura con **FastAPI** + **MongoDB** (Motor, asíncrono).
+(**Agenda**). Implementa la base móvil, la arquitectura modular, la autenticación
+segura y el **CRUD de eventos** con **FastAPI** + **MongoDB** (Motor, asíncrono).
 
 ## Stack
 
@@ -24,19 +24,27 @@ CALENDARIO/
 │   │   ├── database.py         # Conexión MongoDB Singleton (patrón + lifespan)
 │   │   └── security.py         # Hashing Argon2 y creación/validación de JWT
 │   ├── models/                 # Representación de documentos (capa de datos)
-│   │   └── user.py             # UserModel + PyObjectId + nombre de colección
+│   │   ├── common.py           # PyObjectId (tipo BSON reutilizable)
+│   │   ├── user.py             # UserModel + nombre de colección
+│   │   └── event.py            # EventModel + Priority + categorías sugeridas
 │   ├── schemas/                # Contratos de entrada/salida de la API (Pydantic)
 │   │   ├── user.py             # UserCreate, UserPublic
-│   │   └── auth.py             # LoginRequest, Token
+│   │   ├── auth.py             # LoginRequest, Token
+│   │   └── event.py            # EventCreate, EventUpdate, EventPublic
 │   ├── services/               # Lógica de negocio / acceso a datos
-│   │   └── user_service.py     # CRUD de usuarios + dependencia get_user_service
+│   │   ├── user_service.py     # CRUD de usuarios + dependencia get_user_service
+│   │   └── event_service.py    # CRUD de eventos (scoped por usuario) + get_event_service
 │   ├── dependencies/           # Dependencias reutilizables de FastAPI
 │   │   └── auth.py             # get_current_user (protección de rutas)
 │   └── routers/                # Endpoints HTTP
-│       └── auth.py             # /auth/register, /auth/login, /auth/me
+│       ├── auth.py             # /auth/register, /auth/login, /auth/me
+│       └── events.py           # /events (CRUD protegido)
 ├── tests/                      # (pendiente para siguientes sprints)
+├── scripts/
+│   └── export_openapi.py       # Genera openapi.yml desde el código (code-first)
 ├── .env.example                # Plantilla de variables de entorno
 ├── .gitignore
+├── openapi.yml                 # Contrato OpenAPI generado (copia estática para el front)
 ├── requirements.txt
 └── README.md
 ```
@@ -99,13 +107,72 @@ curl http://localhost:8000/api/v1/auth/me \
   -H "Authorization: Bearer <access_token>"
 ```
 
+## Eventos (Sprint 2)
+
+CRUD de actividades diarias. **Todas** las rutas requieren `Authorization: Bearer
+<token>` (protegidas por la dependencia `get_current_user`).
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/events/categories` | Categorías sugeridas (presets) |
+| POST | `/events` | Crear un evento (201) |
+| GET | `/events` | Listar mis eventos con filtros y paginación |
+| GET | `/events/{id}` | Obtener un evento propio |
+| PATCH | `/events/{id}` | Actualizar parcialmente un evento propio |
+| DELETE | `/events/{id}` | Eliminar un evento propio (204) |
+
+Campos de un evento: `title` (1–120), `description` opcional (≤2000),
+`date` (`YYYY-MM-DD`), `time` (`HH:MM`, 24 h), `category` (texto libre normalizado,
+≤40; se sugieren `personal`, `trabajo`, `estudio`, `salud`, `ocio`, `otro`) y
+`priority` (`baja` | `media` | `alta`).
+
+Filtros del listado (`GET /events`): `category`, `priority`, `date_from`,
+`date_to`, `limit` (1–100, def. 20) y `offset` (≥0).
+
+La documentación interactiva (`/docs` y `/redoc`) describe cada endpoint con sus
+parámetros, las respuestas de error (401/403/404/409/422) y ejemplos de
+petición/respuesta; el esquema OpenAPI completo se sirve en `/openapi.json`.
+
+Para consumir el contrato sin levantar el servidor —generar un cliente o los
+tipos del frontend, mocks, validar en CI— hay una copia estática versionada en
+[`openapi.yml`](./openapi.yml). Es un **artefacto generado** a partir del código
+(FastAPI es *code-first*), así que **hay que regenerarlo** cuando cambien las
+rutas o los schemas:
+
+```bash
+python scripts/export_openapi.py
+```
+
+```bash
+# Crear
+curl -X POST http://localhost:8000/api/v1/events \
+  -H "Authorization: Bearer <access_token>" -H "Content-Type: application/json" \
+  -d '{"title":"Cita dentista","description":"Llevar radiografía","date":"2026-11-05","time":"10:30","category":"salud","priority":"alta"}'
+
+# Listar (filtros + paginación)
+curl "http://localhost:8000/api/v1/events?priority=alta&date_from=2026-11-01&limit=10" \
+  -H "Authorization: Bearer <access_token>"
+
+# Obtener / actualizar parcial / eliminar
+curl http://localhost:8000/api/v1/events/<event_id> -H "Authorization: Bearer <access_token>"
+curl -X PATCH http://localhost:8000/api/v1/events/<event_id> \
+  -H "Authorization: Bearer <access_token>" -H "Content-Type: application/json" \
+  -d '{"priority":"media"}'
+curl -X DELETE http://localhost:8000/api/v1/events/<event_id> -H "Authorization: Bearer <access_token>"
+```
+
 ## Notas de seguridad aplicadas (OWASP API Top 10)
 
-- **API1/API2 (Broken Auth):** contraseñas con Argon2, JWT firmado con `exp`/`iss`/`nbf`,
+- **API1 (BOLA / IDOR):** toda consulta a `events` filtra por el `user_id` del token;
+  un evento ajeno responde `404` (igual que uno inexistente) para no revelar su
+  existencia, y el dueño nunca se acepta desde el cliente (`extra="forbid"`).
+- **API2 (Broken Authentication):** contraseñas con Argon2, JWT firmado con `exp`/`iss`/`nbf`,
   validación de credenciales con mensaje genérico (evita enumeración de usuarios).
-- **API3 (Excessive Data Exposure):** el `password_hash` nunca se serializa en respuestas.
-- **API8 (Injection):** validación estricta de entrada con Pydantic; sin construcción de
-  queries con concatenación de strings.
+- **API3 (Excessive Data Exposure):** el `password_hash` nunca se serializa en respuestas
+  y `EventPublic` no expone `user_id`.
+- **API8 (Injection):** validación estricta de entrada con Pydantic; los `id` se validan
+  como `ObjectId` y las queries se construyen solo con campos tipados (sin concatenación
+  ni diccionarios crudos del cliente).
 - **API10 / manejo de errores:** un handler global oculta las trazas internas y registra
   el error en el servidor, devolviendo un `500` genérico al cliente.
 - **Cabeceras de seguridad** añadidas por middleware (`nosniff`, `X-Frame-Options`, HSTS).

@@ -19,6 +19,7 @@ from app.core.security import (
 from app.dependencies.auth import get_current_user
 from app.models.user import UserModel
 from app.schemas.auth import LoginRequest, Token
+from app.schemas.common import ErrorResponse
 from app.schemas.user import UserCreate, UserPublic
 from app.services.user_service import UserService, get_user_service
 
@@ -32,6 +33,17 @@ router = APIRouter(prefix="/auth", tags=["Autenticación"])
     response_model=UserPublic,
     status_code=status.HTTP_201_CREATED,
     summary="Registrar un nuevo usuario",
+    description=(
+        "Da de alta un usuario. La contraseña debe cumplir la política mínima "
+        "(longitud, mayúscula, minúscula, dígito y carácter especial). "
+        "El email no puede estar ya registrado."
+    ),
+    response_description="El usuario creado (sin datos sensibles).",
+    operation_id="registerUser",
+    responses={
+        409: {"model": ErrorResponse, "description": "El email ya está registrado"},
+        422: {"model": ErrorResponse, "description": "Datos de entrada inválidos"},
+    },
 )
 async def register(
     payload: UserCreate,
@@ -59,6 +71,18 @@ async def register(
     "/login",
     response_model=Token,
     summary="Iniciar sesión y obtener un access token",
+    description=(
+        "Valida las credenciales y devuelve un JWT de acceso. Si el email no "
+        "existe o la contraseña no coincide, responde 401 con un mensaje genérico "
+        "(no revela cuál de los dos campos falló)."
+    ),
+    response_description="El token de acceso y su tiempo de vida en segundos.",
+    operation_id="loginUser",
+    responses={
+        401: {"model": ErrorResponse, "description": "Email o contraseña incorrectos"},
+        403: {"model": ErrorResponse, "description": "La cuenta está desactivada"},
+        422: {"model": ErrorResponse, "description": "Datos de entrada inválidos"},
+    },
 )
 async def login(
     payload: LoginRequest,
@@ -96,6 +120,16 @@ async def login(
     "/me",
     response_model=UserPublic,
     summary="Obtener el usuario autenticado",
+    description=(
+        "Devuelve los datos públicos del usuario dueño del token. Requiere "
+        "`Authorization: Bearer <token>`."
+    ),
+    response_description="El usuario autenticado.",
+    operation_id="readCurrentUser",
+    responses={
+        401: {"model": ErrorResponse, "description": "Token ausente o inválido"},
+        403: {"model": ErrorResponse, "description": "La cuenta está desactivada"},
+    },
 )
 async def read_current_user(
     current_user: UserModel = Depends(get_current_user),

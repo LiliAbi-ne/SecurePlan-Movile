@@ -8,3 +8,5 @@
 - Expects commented, production-ready code plus supporting deliverables: recommended folder structure, `requirements.txt` dependency list, and setup instructions. Confidence: 0.6
 - Prefers the agent to write/create files directly in the project directory rather than delivering code to copy-paste from the chat. Confidence: 0.75
 - Prefers concise, brief summaries of work done (asks for explanations "con pocas palabras") over long detailed write-ups. Confidence: 0.6
+- Works with a separate frontend consumer and wants a machine-readable API contract exported to a static file (e.g. `openapi.yml` generated from the code) rather than only a runtime docs endpoint. Confidence: 0.5
+- Prefers that generated artifacts and their regeneration workflow be documented in the README (project structure tree included); when offered README docs vs. CI automation, opts for README documentation. Confidence: 0.45
