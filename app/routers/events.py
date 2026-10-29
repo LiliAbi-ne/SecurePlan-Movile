@@ -27,6 +27,7 @@ from app.dependencies.auth import get_current_user
 from app.models.common import PyObjectId
 from app.models.event import DEFAULT_CATEGORIES, Priority
 from app.models.user import UserModel
+from app.schemas.common import ErrorResponse
 from app.schemas.event import EventCreate, EventPublic, EventUpdate
 from app.services.event_service import EventService, get_event_service
 
@@ -35,6 +36,19 @@ router = APIRouter(
     tags=["Eventos"],
     dependencies=[Depends(get_current_user)],
 )
+
+# --- Respuestas de error reutilizables (documentación OpenAPI) ---------------
+# Comunes a todos los endpoints porque el router exige autenticación.
+_AUTH_RESPONSES = {
+    401: {"model": ErrorResponse, "description": "Token ausente o inválido"},
+    403: {"model": ErrorResponse, "description": "La cuenta está desactivada"},
+}
+_VALIDATION_RESPONSE = {
+    422: {"model": ErrorResponse, "description": "Datos de entrada inválidos"},
+}
+_NOT_FOUND_RESPONSE = {
+    404: {"model": ErrorResponse, "description": "Evento no encontrado"}
+}
 
 
 def _not_found_exception() -> HTTPException:
@@ -52,6 +66,13 @@ def _not_found_exception() -> HTTPException:
     "/categories",
     response_model=list[str],
     summary="Categorías sugeridas",
+    description=(
+        "Devuelve las categorías preset que la app ofrece como atajo. No es una "
+        "lista cerrada: el campo `category` admite cualquier texto válido."
+    ),
+    response_description="Lista de categorías sugeridas.",
+    operation_id="listEventCategories",
+    responses={**_AUTH_RESPONSES},
 )
 async def list_categories() -> list[str]:
     return list(DEFAULT_CATEGORIES)
@@ -62,6 +83,14 @@ async def list_categories() -> list[str]:
     response_model=EventPublic,
     status_code=status.HTTP_201_CREATED,
     summary="Crear un evento",
+    description=(
+        "Crea un evento cuyo dueño es SIEMPRE el usuario del token. Cualquier "
+        "intento de fijar el dueño (`user_id`) u otros campos internos se rechaza "
+        "con 422."
+    ),
+    response_description="El evento creado.",
+    operation_id="createEvent",
+    responses={**_AUTH_RESPONSES, **_VALIDATION_RESPONSE},
 )
 async def create_event(
     payload: EventCreate,
@@ -75,6 +104,14 @@ async def create_event(
     "",
     response_model=list[EventPublic],
     summary="Listar mis eventos",
+    description=(
+        "Lista los eventos del usuario autenticado, ordenados por fecha y hora "
+        "ascendentes. Admite filtros por `category`, `priority` y rango de fechas "
+        "(`date_from`/`date_to`), además de paginación con `limit`/`offset`."
+    ),
+    response_description="Los eventos del usuario que cumplen los filtros.",
+    operation_id="listEvents",
+    responses={**_AUTH_RESPONSES, **_VALIDATION_RESPONSE},
 )
 async def list_events(
     current_user: UserModel = Depends(get_current_user),
@@ -101,6 +138,18 @@ async def list_events(
     "/{event_id}",
     response_model=EventPublic,
     summary="Obtener un evento propio",
+    description=(
+        "Devuelve un evento del usuario. Si el evento no existe o pertenece a otro "
+        "usuario se responde 404 en ambos casos, para no revelar su existencia "
+        "(mitigación de IDOR / OWASP API1 BOLA)."
+    ),
+    response_description="El evento solicitado.",
+    operation_id="getEvent",
+    responses={
+        **_AUTH_RESPONSES,
+        **_NOT_FOUND_RESPONSE,
+        **_VALIDATION_RESPONSE,
+    },
 )
 async def get_event(
     event_id: PyObjectId,
@@ -117,6 +166,18 @@ async def get_event(
     "/{event_id}",
     response_model=EventPublic,
     summary="Actualizar un evento propio",
+    description=(
+        "Actualización parcial: solo se modifican los campos enviados (al menos "
+        "uno). `description: null` borra la descripción; el resto de campos no "
+        "pueden ser nulos. Un evento ajeno responde 404, igual que uno inexistente."
+    ),
+    response_description="El evento actualizado.",
+    operation_id="updateEvent",
+    responses={
+        **_AUTH_RESPONSES,
+        **_NOT_FOUND_RESPONSE,
+        **_VALIDATION_RESPONSE,
+    },
 )
 async def update_event(
     event_id: PyObjectId,
@@ -134,6 +195,17 @@ async def update_event(
     "/{event_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Eliminar un evento propio",
+    description=(
+        "Elimina un evento del usuario. Responde 204 sin cuerpo si lo borra, o "
+        "404 si no existe o pertenece a otro usuario."
+    ),
+    response_description="Evento eliminado (sin cuerpo).",
+    operation_id="deleteEvent",
+    responses={
+        **_AUTH_RESPONSES,
+        **_NOT_FOUND_RESPONSE,
+        **_VALIDATION_RESPONSE,
+    },
 )
 async def delete_event(
     event_id: PyObjectId,

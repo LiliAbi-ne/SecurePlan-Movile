@@ -50,6 +50,7 @@ CALENDARIO/
 ├── requirements-dev.txt        # Dependencias de desarrollo/test
 ├── .env.example                # Plantilla de variables de entorno
 ├── .gitignore
+├── openapi.yml                 # Contrato OpenAPI generado (copia estática para el front)
 ├── requirements.txt
 └── README.md
 ```
@@ -133,6 +134,20 @@ Campos de un evento: `title` (1–120), `description` opcional (≤2000),
 
 Filtros del listado (`GET /events`): `category`, `priority`, `date_from`,
 `date_to`, `limit` (1–100, def. 20) y `offset` (≥0).
+
+La documentación interactiva (`/docs` y `/redoc`) describe cada endpoint con sus
+parámetros, las respuestas de error (401/403/404/409/422) y ejemplos de
+petición/respuesta; el esquema OpenAPI completo se sirve en `/openapi.json`.
+
+Para consumir el contrato sin levantar el servidor —generar un cliente o los
+tipos del frontend, mocks, validar en CI— hay una copia estática versionada en
+[`openapi.yml`](./openapi.yml). Es un **artefacto generado** a partir del código
+(FastAPI es *code-first*), así que **hay que regenerarlo** cuando cambien las
+rutas o los schemas:
+
+```bash
+python scripts/export_openapi.py
+```
 
 ```bash
 # Crear

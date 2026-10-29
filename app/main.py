@@ -45,9 +45,45 @@ async def lifespan(app: FastAPI):
 # La documentación interactiva se deshabilita en producción.
 _docs_enabled = not settings.is_production
 
+# Descripción global que encabeza la documentación interactiva (/docs y /redoc).
+_DESCRIPTION = """
+API desacoplada para la aplicación móvil de gestión del tiempo **Agenda**.
+
+## Autenticación
+Las rutas de **Eventos** requieren un token JWT. Obtén uno en
+`POST /api/v1/auth/login` y pulsa el botón **Authorize** para enviarlo como
+`Authorization: Bearer <token>`.
+
+## Aislamiento por usuario
+Cada usuario solo puede ver y gestionar **sus propios** eventos. Un evento ajeno
+se responde como inexistente (404) para no revelar su existencia (mitigación de
+IDOR / OWASP API1 BOLA).
+"""
+
+# Descripciones de los tags usados por los routers (orden = orden en /docs).
+_TAGS_METADATA = [
+    {"name": "Sistema", "description": "Estado del servicio (health check)."},
+    {
+        "name": "Autenticación",
+        "description": (
+            "Registro, inicio de sesión y datos del usuario autenticado. "
+            "Las contraseñas se almacenan con Argon2 y los tokens son JWT firmados."
+        ),
+    },
+    {
+        "name": "Eventos",
+        "description": (
+            "CRUD de actividades diarias. Todas las rutas requieren autenticación "
+            "y están acotadas al usuario del token (anti-IDOR)."
+        ),
+    },
+]
+
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
+    description=_DESCRIPTION,
+    openapi_tags=_TAGS_METADATA,
     lifespan=lifespan,
     docs_url="/docs" if _docs_enabled else None,
     redoc_url="/redoc" if _docs_enabled else None,
@@ -111,6 +147,13 @@ app.include_router(events.router, prefix=settings.API_V1_PREFIX)
 
 
 # --- Endpoint de salud (útil para orquestadores / load balancers) ---
-@app.get(f"{settings.API_V1_PREFIX}/health", tags=["Sistema"], summary="Health check")
+@app.get(
+    f"{settings.API_V1_PREFIX}/health",
+    tags=["Sistema"],
+    summary="Health check",
+    description="Comprueba que el servicio está en pie (útil para orquestadores).",
+    response_description="Estado del servicio.",
+    operation_id="healthCheck",
+)
 async def health() -> dict[str, str]:
     return {"status": "ok"}
