@@ -39,9 +39,15 @@ CALENDARIO/
 │   └── routers/                # Endpoints HTTP
 │       ├── auth.py             # /auth/register, /auth/login, /auth/me
 │       └── events.py           # /events (CRUD protegido)
-├── tests/                      # (pendiente para siguientes sprints)
-├── scripts/
-│   └── export_openapi.py       # Genera openapi.yml desde el código (code-first)
+├── tests/                      # Suite de tests (pytest) + doble en memoria de Mongo
+│   ├── conftest.py             # Fixtures (client, database, user_factory)
+│   ├── fakes.py                # Doble en memoria que respeta los filtros
+│   ├── data.py                 # Datos de ejemplo
+│   ├── test_schemas.py         # Validación estricta de entrada
+│   ├── test_event_service.py   # Servicio: filtros, paginación y scoping por dueño
+│   └── test_events_api.py      # Endpoints: CRUD, errores y aislamiento (IDOR)
+├── pytest.ini                  # Configuración de pytest
+├── requirements-dev.txt        # Dependencias de desarrollo/test
 ├── .env.example                # Plantilla de variables de entorno
 ├── .gitignore
 ├── openapi.yml                 # Contrato OpenAPI generado (copia estática para el front)
@@ -160,6 +166,21 @@ curl -X PATCH http://localhost:8000/api/v1/events/<event_id> \
   -d '{"priority":"media"}'
 curl -X DELETE http://localhost:8000/api/v1/events/<event_id> -H "Authorization: Bearer <access_token>"
 ```
+
+## Tests
+
+Suite con **pytest** que corre **sin necesidad de MongoDB**: usa un doble en
+memoria (`tests/fakes.py`) que respeta los filtros, incluido el `user_id`, por lo
+que el aislamiento anti-IDOR se valida de verdad.
+
+```bash
+pip install -r requirements-dev.txt
+pytest            # o:  pytest -q
+```
+
+Cubre: validación estricta de los schemas, el servicio (filtros, paginación y
+scoping por dueño) y los endpoints (CRUD, 401/403/422 y aislamiento entre
+usuarios).
 
 ## Notas de seguridad aplicadas (OWASP API Top 10)
 
